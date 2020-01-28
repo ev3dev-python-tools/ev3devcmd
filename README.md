@@ -39,7 +39,7 @@ To list all sub-commands run:
                   ...
 
     Commands to upload/start/download/delete/cleanup programs on the EV3
-    Complete documentation at: https://github.com/harcokuppens/thonny-ev3dev/wiki/ev3devcmd
+    Complete documentation at: https://github.com/ev3dev-python-tools/ev3devcmd/
 
     positional arguments:
       {list,upload,download,delete,cleanup,mirror,start,stop,install_logging,install_rpyc_server}
