@@ -17,7 +17,7 @@ credentials to connect with usb cable to the ev3:
 
 The reason for using usb tethering is the fixed ip=192.168.0.1. Once setup you can allows access the EV3 brick by 
 just connect the usb cable and you can just connect using this ip address. 
-For more details about usb tethering mode see [[Connect with EV3]].
+For more details about usb tethering mode see: https://github.com/ev3dev-python-tools/thonny-ev3dev/wiki/Connect-with-EV3
 
 
 However you can also use a different ip,user and password  with ev3devcmd package if you have a different 
@@ -30,8 +30,6 @@ variables **EV3IP**, **EV3USERNAME** and **EV3PASSWORD**.
 The ev3dev command-line program uses the ev3devcmd library to make it possible to upload/start/download/delete/cleanup programs from the EV3 using a command shell on your PC.
 
 The ev3dev command-line programs support for each action of upload/start/download/delete a sub-command.
-
-For the 'steer' command to work you must use the [[ev3devcontext]] library.
 
 To list all sub-commands run:
 
