@@ -605,7 +605,7 @@ def main(argv=None):
     # use RawDescriptionHelpFormatter: which allows formatting you desription with newlines yourself, however the commandline options
     #                                  are formatted automatically (newlines you place are ignored).
     parser = argparse.ArgumentParser(prog='ev3dev', formatter_class=argparse.RawDescriptionHelpFormatter,
-              description="Commands to upload/start/download/delete/cleanup programs on the EV3\nComplete documentation at: https://github.com/harcokuppens/thonny-ev3dev/wiki/ev3devcmd ")
+              description="Commands to upload/start/download/delete/cleanup programs on the EV3\nComplete documentation at: https://github.com/ev3dev-python-tools/ev3devcmd/ ")
 
     parser.add_argument('-a', '--address',action='store',default=default_ip,help="network address of EV3. Can also be set with EV3IP environment variable.")
     parser.add_argument('-u', '--username',action='store',default=default_user,help="username used to login with ssh on EV3. Can also be set with EV3USERNAME environment variable.")
