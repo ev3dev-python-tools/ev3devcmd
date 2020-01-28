@@ -7,7 +7,7 @@ The ev3devcmd package delivers
 
 The ev3devcmd library lets you integrate support for the EV3 into an IDE. For example with the Thonny IDE you
 can install the thonny-ev3dev plugin which uses the ev3devcmd library to implement support for the EV3. The plugin adds
-buttons like upload, or "download the log" which behind the scene use the ev3devcmd library. <br>
+buttons like "upload program", or "download the log" which behind the scene use the ev3devcmd library. <br>
 See: https://github.com/ev3dev-python-tools/thonny-ev3dev/wiki
 
 The ev3dev command-line tool lets 
