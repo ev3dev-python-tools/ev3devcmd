@@ -11,7 +11,7 @@ buttons like upload, or "download the log" which behind the scene use the ev3dev
 See: https://github.com/ev3dev-python-tools/thonny-ev3dev/wiki
 
 The ev3dev command-line tool lets 
-you use the functionality of the ev3devcmd library on the command-line.
+you use the functionality of the ev3devcmd library on the command-line without using any IDE.
 
 The ev3devcmd package plugin assumes by default that you use USB tethering mode on the ev3 with the default ev3dev 
 credentials to connect with usb cable to the ev3:
