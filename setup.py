@@ -5,7 +5,7 @@ import sys
 
 setup(
       name="ev3devcmd",
-      version="0.39",
+      version="1.0.0",
       description="ev3devcmd library and cmdline utility",
       long_description="""
 ev3devcmd library and cmdline utility
@@ -43,10 +43,25 @@ For more info: https://github.com/harcokuppens/thonny-ev3dev/wiki/ev3devcmd
       keywords="IDE education programming EV3 mindstorms lego",
       platforms=["Windows", "macOS", "Linux"],
       python_requires=">=3.6",
-      install_requires=['ev3devlogging','paramiko==2.6.0','sftpclone==1.2.2','rpyc==4.1.2'],
-      py_modules=["ev3devcmd"],
-      #hack to add resource dir to simple python module: using fake package
-      packages=["ev3devcmd_res"],
-      package_data={'ev3devcmd_res': ['./*']},
-      scripts=['bin/ev3dev']
+
+      # TEMPORARY HACK:
+      # We use a mirror of sftpclone v1.2.2, because it has explicit dependency 'paramiko==2.4.1',
+      # but we need 'paramiko==2.6.0' for ev3devcmd!
+      # When we used sftpclone v1.2.2 as dependency, then the entry script would thrown an version conflict error
+      # because ev3devcmd needs 'paramiko==2.6.0' and sftpclone needs 'paramiko==2.4.1'.
+      # But sftpclone v1.2.2 works fine with the newer 'paramiko==2.6.0', so we took the HACK to include a mirror of it,
+      # into this ev3devcmd package until a newer version of it requiring 'paramiko==2.6.0' would be available.
+      # This HACK solves the dependency problem, because we then don't need the requirement for 'sftpclone=1.2.2' anymore.
+      install_requires=['ev3devlogging','paramiko==2.6.0','rpyc==4.1.2'],
+      packages=['ev3devcmd','ev3devcmd.sftpclone'],
+      #install_requires=['ev3devlogging','paramiko==2.6.0','sftpclone==1.2.2','rpyc==4.1.2'],
+      #packages=['ev3devcmd'],
+
+      package_data={'ev3devcmd': ['res/*']},
+
+      entry_points={
+                 'console_scripts': [
+                     'ev3dev = ev3devcmd.__main__:main'
+                 ]
+    },
 )
