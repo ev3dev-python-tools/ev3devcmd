@@ -511,7 +511,7 @@ def install_rpyc_server(args):
 
     print("install rpyc-4.1.2 package on EV3 (can take 60 seconds)")
 
-    ftp.put(os.path.join(dir_path,'ev3devcmd_res','rpyc-4.1.2.tar.gz'), '/tmp/rpyc-4.1.2.tar.gz')
+    ftp.put(os.path.join(dir_path,'res','rpyc-4.1.2.tar.gz'), '/tmp/rpyc-4.1.2.tar.gz')
 
     stdin, stdout, stderr = ssh.exec_command('sudo tar -C /tmp -xzvf /tmp/rpyc-4.1.2.tar.gz',get_pty=True)
     stdin.write(args.password+'\n')
@@ -527,7 +527,7 @@ def install_rpyc_server(args):
 
     print("add rpycd.service")
 
-    ftp.put(os.path.join(dir_path,'ev3devcmd_res','rpycd.service'), '/tmp/rpycd.service')
+    ftp.put(os.path.join(dir_path,'res','rpycd.service'), '/tmp/rpycd.service')
 
 
     stdin, stdout, stderr = ssh.exec_command('sudo mv /tmp/rpycd.service /etc/systemd/system/rpycd.service',get_pty=True)
