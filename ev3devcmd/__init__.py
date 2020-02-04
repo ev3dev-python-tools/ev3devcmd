@@ -1,3 +1,4 @@
+import errno
 import socket
 import paramiko
 import rpyc
@@ -459,6 +460,18 @@ def new_rmdir(remote_path):
     orig_rmdir(remote_path)
 
 
+def rexists(sftp, path):
+    """os.path.exists for paramiko's sftp object
+    """
+    try:
+        sftp.stat(path)
+    except IOError as e:
+        if e.errno == errno.ENOENT:
+            return False
+        raise
+    else:
+        return True
+
 def base_mirror(args,local_path,dest_path,mkdir_dest=False,rmdir_dest=False):
    # do extra connect  only for nice error message in case of failure (don't want to hack sftpclone library for that)
     ssh=sshconnect(args)
@@ -500,7 +513,7 @@ def base_mirror(args,local_path,dest_path,mkdir_dest=False,rmdir_dest=False):
     orig_rmdir=sync.sftp.rmdir
     sync.sftp.rmdir=new_rmdir
 
-    if mkdir_dest:
+    if mkdir_dest and not rexists(sync.sftp,dest_path):
         try:
             sync.sftp.mkdir(dest_path)
         except Exception as ex:
