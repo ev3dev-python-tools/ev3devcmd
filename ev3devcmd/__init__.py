@@ -67,6 +67,8 @@ def line_buffered(f):
             line_buf = ''
 
 
+def ev3rootdir(args):
+    return '/home/'+ args.username + '/'
 
 def upload(args):
     # allow any source path on pc ( relative paths taken relative from cwd where this command is executed)
@@ -79,7 +81,7 @@ def upload(args):
 
     # for simplicity:  can only upload file into  homedir, 
     #                  so we only need to specify srcpath of file on pc
-    destpath='/home/'+ args.username + '/' + filename
+    destpath=ev3rootdir(args) + filename
 
 
     print("uploading file to EV3 as: " + destpath)
@@ -108,7 +110,7 @@ def start(args):
     # for safety:  we can only upload file into  homedir
     # so programs we start also only in homedir
 
-    srcpath='/home/'+ args.username + '/' + os.path.basename(args.file)
+    srcpath=ev3rootdir(args) + os.path.basename(args.file)
 
     print("Start the execution of the file '{0}' on the EV3'.".format(srcpath))
     ssh=sshconnect(args)
@@ -216,7 +218,8 @@ def stop_rpyc(args):
 
     print("kill programs running on EV3")
     # kill programs running on ev3
-    command="kill -9 -`pgrep -f 'python3 /home/robot'`"
+    command="kill -9 -`pgrep -f 'python3 " + ev3rootdir(args) + "'`"
+
     # no sudo needed, program runs as user robot
     os.system(command)
 
@@ -250,7 +253,7 @@ def stop_ssh(args):
 
         # first quickly kill process, then do slower cleanup afterwards
         print("kill program running on EV3\n")
-        ssh.exec_command("kill -9 -`pgrep -f 'python3 /home/robot'`")
+        ssh.exec_command("kill -9 -`pgrep -f 'python3 " + ev3rootdir(args) + "'`")
 
         # create interactive shell
         client_shell = ssh.invoke_shell()
@@ -308,7 +311,7 @@ def download(args):
     # for simplicity:  can only download file from  homedir on ev3, 
     #                  so we only need to specify destpath of file on pc
     filename=os.path.basename(args.file)
-    srcpath='/home/'+ args.username + '/' + filename
+    srcpath=ev3rootdir(args) + filename
     destdir=os.path.normpath(os.path.join(os.getcwd(), os.path.dirname(args.file)))
     destpath=os.path.join(destdir,filename)
 
@@ -349,34 +352,30 @@ def listfiles(args):
      # tree -F
 
     if args.dir=='/home/USERNAME':
-        args.dir='/home/'+args.username
+        args.dir=ev3rootdir(args)
+
+    command= 'tree -nF ' + args.dir
 
     print("List files in '{0}':\n".format(args.dir))
-
     ssh=sshconnect(args)
-
-    stdin, stdout, stderr = ssh.exec_command('tree -nF',get_pty=True)
+    stdin, stdout, stderr = ssh.exec_command(command,get_pty=True)
     stdin.write(args.password+'\n')
     stdin.flush()
     data = stdout.read().splitlines()
     for line in data:
         line = str(line, 'utf-8')
         if not args.password in line:
-           print(line)
+            print(line)
     data = stderr.read().splitlines()
     for line in data:
-         print(str(line, 'utf-8'),file=sys.stderr)
-
-
+        print(str(line, 'utf-8'),file=sys.stderr)
     ssh.close()
-
-
 
 
 def delete(args):
     # deleting a basename => deletes file in user's home directory
     srcpath=args.file
-    destpath='/home/'+ args.username + '/' + os.path.basename(srcpath)
+    destpath=ev3rootdir(args) + os.path.basename(srcpath)
 
     print("Delete on EV3 the file: " + destpath)
     ssh=sshconnect(args)
@@ -385,6 +384,39 @@ def delete(args):
     ftp.close()
     ssh.close()
     print("succesfully deleted on EV3 the file: " + destpath)
+
+
+def rmdir(args):
+    destpath=ev3rootdir(args) + args.subdir
+
+    print("Delete on EV3 the directory: " + destpath)
+    ssh=sshconnect(args)
+    ftp = ssh.open_sftp()
+    try:
+      ftp.rmdir(destpath)
+      print("succesfully deleted on EV3 the directory: " + destpath)
+    except:
+      print("ERROR - Failed deleting the directory: " + destpath + "\nMaybe the directory was not empty. Make it first empty with the command  'ev3dev cleanup "+ args.subdir + "'",file=sys.stderr)
+    finally:
+      ftp.close()
+      ssh.close()
+
+
+
+def mkdir(args):
+    destpath=ev3rootdir(args) + args.subdir
+
+    print("Create on EV3 the directory: " + destpath)
+    ssh=sshconnect(args)
+    ftp = ssh.open_sftp()
+    try:
+        ftp.mkdir(destpath)
+        print("succesfully created on EV3 the directory: " + destpath)
+    except Exception as ex:
+        print("ERROR - Failed creating the directory: " + destpath,file=sys.stderr)
+    finally:
+        ftp.close()
+        ssh.close()
 
 
 
@@ -416,7 +448,7 @@ def new_rmdir(remote_path):
     orig_rmdir(remote_path)
 
 
-def base_mirror(args,local_path,dest_path):
+def base_mirror(args,local_path,dest_path,mkdir_dest=False,rmdir_dest=False):
    # do extra connect  only for nice error message in case of failure (don't want to hack sftpclone library for that)
     ssh=sshconnect(args)
 
@@ -424,7 +456,7 @@ def base_mirror(args,local_path,dest_path):
 
     # disable the default of DEBUG logging into CRITICAL only logging
     import logging
-    sftpclone.logger = sftpclone.configure_logging(level=logging.CRITICAL)
+    sftpclone.logger = sftpclone.configure_logging(level=logging.ERROR)
     sync = sftpclone.SFTPClone(local_path,remote_url)
 
     # exclude from syncing the files and dirs in root of sourcedir which start with '.'
@@ -450,15 +482,20 @@ def base_mirror(args,local_path,dest_path):
 
     global orig_rmdir
 
-    #sftp.remove
+
     orig_remove=sync.sftp.remove
     sync.sftp.remove=new_remove
 
-    #sftp.rmdir
     orig_rmdir=sync.sftp.rmdir
     sync.sftp.rmdir=new_rmdir
 
+    if mkdir_dest:
+        sync.sftp.mkdir(dest_path)
+
     sync.run()
+
+    if rmdir_dest:
+       sync.sftp.rmdir(dest_path)
 
 
 
@@ -469,15 +506,18 @@ def base_mirror(args,local_path,dest_path):
 def mirror(args):
 
     src_path=args.sourcedir
-    dest_path='/home/'+ args.username
+    dest_path=ev3rootdir(args)
+    make_subdir=False
     if args.subdir != None:
         if(  os.path.isabs(args.subdir) ):
             print("Subdir argument '{0}' is not a relative path".format(args.subdir),file=sys.stderr)
             sys.exit(1)
-        dest_path='/home/'+ args.username + '/' + args.subdir
+        dest_path=ev3rootdir(args) + args.subdir
+        make_subdir=True
+
 
     print("Mirror")
-    base_mirror(args,src_path,dest_path)
+    base_mirror(args,src_path,dest_path,mkdir_dest=make_subdir)
     print("\n\nmirror succesfull")
 
 def cleanup(args):
@@ -486,18 +526,20 @@ def cleanup(args):
     # however we can also only cleanup a subdir of homedir
     # note: also removes subdirs in homedir
 
-    dest_path='/home/'+ args.username
+    dest_path=ev3rootdir(args)
+    remove_subdir=False
     if args.subdir != None:
        if(  os.path.isabs(args.subdir) ):
            print("Subdir argument '{0}' is not a relative path".format(args.subdir),file=sys.stderr)
            sys.exit(1)
-       dest_path='/home/'+ args.username + '/' + args.subdir
+       dest_path=ev3rootdir(args) + args.subdir
+       remove_subdir=True
 
     import tempfile
     src_path=tempfile.mkdtemp()
 
     print("Cleanup")
-    base_mirror(args,src_path,dest_path)
+    base_mirror(args,src_path,dest_path,rmdir_dest=remove_subdir)
     print("\n\ncleanup succesfull")
 
 
@@ -586,6 +628,10 @@ def install_ev3devlogging(args):
     ssh.close()
 
 
+
+class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
+      pass
+
 def main(argv=None):
     """
     Entry point for the command line tool 'ev3dev'.
@@ -602,10 +648,21 @@ def main(argv=None):
     default_password=os.environ.get('EV3PASSWORD') or 'maker'
 
 
+    if "-V" in  argv[1:] or "--version" in argv[1:]:
+        from ev3devcmd import version as cmdversion
+        print("version: " + cmdversion.__version__)
+        sys.exit(0)
+
     # use RawDescriptionHelpFormatter: which allows formatting you desription with newlines yourself, however the commandline options
     #                                  are formatted automatically (newlines you place are ignored).
-    parser = argparse.ArgumentParser(prog='ev3dev', formatter_class=argparse.RawDescriptionHelpFormatter,
-              description="Commands to upload/start/download/delete/cleanup programs on the EV3\nComplete documentation at: https://github.com/ev3dev-python-tools/ev3devcmd/ ")
+    # use ArgumentDefaultsHelpFormatter: so that also default values are shown in help message
+    # note: both are combined in CustomFormatter class above
+    parser = argparse.ArgumentParser(prog='ev3dev', formatter_class=CustomFormatter,
+                                     description="Commands to upload/start/download/delete/cleanup programs on the EV3.\nAll file operations on the EV3 are only allowed within the user's homedir.\nComplete documentation at: https://github.com/ev3dev-python-tools/ev3devcmd/.")
+
+    parser.add_argument("-V", "--version",
+                        action='store_true',
+                        help="Show version info",default=argparse.SUPPRESS)
 
     parser.add_argument('-a', '--address',action='store',default=default_ip,help="network address of EV3. Can also be set with EV3IP environment variable.")
     parser.add_argument('-u', '--username',action='store',default=default_user,help="username used to login with ssh on EV3. Can also be set with EV3USERNAME environment variable.")
@@ -619,68 +676,79 @@ def main(argv=None):
 
     # create the parser for the "list" command
     parser_list_description ="list all files in homedir on EV3"
-    parser_list = subparsers.add_parser('list', description=parser_list_description, help=parser_list_description)
+    parser_list = subparsers.add_parser('list', description=parser_list_description, help=parser_list_description,formatter_class=CustomFormatter)
     parser_list.set_defaults(func=listfiles)
     parser_list.add_argument('dir', nargs='?', default='/home/USERNAME')
     # create the parser for the "upload" command
     parser_upload_description ="upload file to homedir on EV3"
-    parser_upload = subparsers.add_parser('upload', description=parser_upload_description, help=parser_upload_description)
+    parser_upload = subparsers.add_parser('upload', description=parser_upload_description, help=parser_upload_description,formatter_class=CustomFormatter)
     parser_upload.add_argument('file', type=str,help="source path on pc; destination path on EV3 is /home/USERNAME/basename(file)")
-    parser_upload.add_argument('-f', '--force',action='store_true',help="overwrite file if already exist")
+    parser_upload.add_argument('-f', '--force',action='store_true',help="overwrite file if already exist",default=argparse.SUPPRESS)
     parser_upload.set_defaults(func=upload)
 
 
     # create the parser for the "download" command
     parser_download_description = 'download file from homedir on EV3'
-    parser_download = subparsers.add_parser('download',description=parser_download_description,help=parser_download_description)
+    parser_download = subparsers.add_parser('download',description=parser_download_description,help=parser_download_description,formatter_class=CustomFormatter)
     parser_download.add_argument('file', type=str,help="destination path on pc; source path on EV3 is /home/USERNAME/basename(file)")
-    parser_download.add_argument('-f', '--force',action='store_true',help="overwrite file if already exist")
+    parser_download.add_argument('-f', '--force',action='store_true',help="overwrite file if already exist",default=argparse.SUPPRESS)
     parser_download.set_defaults(func=download)
     # create the parser for the "delete" command
     parser_delete_description='delete a file in homedir on EV3'
-    parser_delete = subparsers.add_parser('delete', description=parser_delete_description,help=parser_delete_description)
+    parser_delete = subparsers.add_parser('delete', description=parser_delete_description,help=parser_delete_description,formatter_class=CustomFormatter)
     parser_delete.add_argument('file', type=str,help="file in EV3's homedir; directory of file is ignored")
     parser_delete.set_defaults(func=delete)
     # create the parser for the "clean" command
     parser_clean_description='delete all files in homedir on EV3'
-    parser_clean = subparsers.add_parser('cleanup',description=parser_clean_description, help=parser_clean_description)
+    parser_clean = subparsers.add_parser('cleanup',description=parser_clean_description, help=parser_clean_description,formatter_class=CustomFormatter)
     parser_clean.add_argument('subdir', nargs='?', type=str,help="subdirectory in homedir; if specified only that directory gets cleaned instead of the whole homedir. Must be relative path.")
     parser_clean.set_defaults(func=cleanup)
     # create the parser for the "clean" command
     parser_mirror_description='mirror sourcedir into homedir on EV3. Also subdirs are mirrored, and all other files/dirs within homedir but not in sourcedir are removed.'
-    parser_mirror = subparsers.add_parser('mirror',description=parser_mirror_description, help=parser_mirror_description)
+    parser_mirror = subparsers.add_parser('mirror',description=parser_mirror_description, help=parser_mirror_description,formatter_class=CustomFormatter)
     parser_mirror.add_argument('sourcedir', type=str,help="source directory which gets mirrored.")
     parser_mirror.add_argument('subdir', nargs='?', type=str,help="subdirectory in homedir where it gets mirrored instead of the homedir. Must be relative path.")
     parser_mirror.set_defaults(func=mirror)
 
+    # create the parser for the "rmdir" command
+    parser_rmdir_description='delete subdirectory in homedir on EV3'
+    parser_rmdir = subparsers.add_parser('rmdir',description=parser_rmdir_description, help=parser_rmdir_description,formatter_class=CustomFormatter)
+    parser_rmdir.add_argument('subdir', type=str,help="subdirectory in homedir; Must be relative path.")
+    parser_rmdir.set_defaults(func=rmdir)
+
+    # create the parser for the "mkdir" command
+    parser_mkdir_description='make subdirectory in homedir on EV3'
+    parser_mkdir = subparsers.add_parser('mkdir',description=parser_mkdir_description, help=parser_mkdir_description,formatter_class=CustomFormatter)
+    parser_mkdir.add_argument('subdir', type=str,help="subdirectory in homedir; Must be relative path.")
+    parser_mkdir.set_defaults(func=mkdir)
+
     # create the parser for the "start" command
     parser_start_description="start program on EV3; program must already be on EV3's homedir"
-    parser_start = subparsers.add_parser('start',description=parser_start_description,help=parser_start_description)
+    parser_start = subparsers.add_parser('start',description=parser_start_description,help=parser_start_description,formatter_class=CustomFormatter)
     parser_start.add_argument('file', type=str,help="program in EV3's homedir; directory of file is ignored")
     parser_start.set_defaults(func=start)
 
     # create the parser for the "stop" command
     parser_stop_description="stop program/motors/sound on EV3"
-    parser_stop = subparsers.add_parser('stop',description=parser_stop_description, help=parser_stop_description)
+    parser_stop = subparsers.add_parser('stop',description=parser_stop_description, help=parser_stop_description,formatter_class=CustomFormatter)
     # rpyc_timeout
     parser_stop.add_argument('-t', '--rpyc-timeout',type=float,help="timeout for rpyc connection", default=0.1)
-    parser_stop.add_argument('-f', '--rpyc-only',action='store_true',help="only connect with rpyc and don't use ssh fallback if rpyc connection fails")
+    parser_stop.add_argument('-f', '--rpyc-only',action='store_true',help="only connect with rpyc and don't use ssh fallback if rpyc connection fails",default=argparse.SUPPRESS)
     parser_stop.set_defaults(func=stop)
 
 
     # create the parser for the "install_ev3devlogging" command
     parser_install_ev3devlogging_description ='install ev3devlogging package on the EV3 when just having installed a newly installed ev3dev image'
-    parser_install_ev3devlogging = subparsers.add_parser('install_logging', description=parser_install_ev3devlogging_description, help=parser_install_ev3devlogging_description)
+    parser_install_ev3devlogging = subparsers.add_parser('install_logging', description=parser_install_ev3devlogging_description, help=parser_install_ev3devlogging_description,formatter_class=CustomFormatter)
     parser_install_ev3devlogging.set_defaults(func=install_ev3devlogging)
 
     # create the parser for the "install_rpyc_server" command
     parser_install_rpyc_server_description = 'install rpyc server on the EV3 when just having installed a newly installed ev3dev image'
-    parser_install_rpyc_server = subparsers.add_parser('install_rpyc_server', description=parser_install_rpyc_server_description, help=parser_install_rpyc_server_description)
+    parser_install_rpyc_server = subparsers.add_parser('install_rpyc_server', description=parser_install_rpyc_server_description, help=parser_install_rpyc_server_description,formatter_class=CustomFormatter)
     parser_install_rpyc_server.set_defaults(func=install_rpyc_server)
 
     # parse args,
     args=parser.parse_args(argv[1:])
-
 
     # and call the function found by parsing, and pass it the args
     args.func(args)

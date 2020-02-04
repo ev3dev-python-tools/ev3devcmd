@@ -10,9 +10,9 @@ setup(
       long_description="""
 ev3devcmd library and cmdline utility
 
-For more info: https://github.com/harcokuppens/thonny-ev3dev/wiki/ev3devcmd
+For more info: https://github.com/ev3dev-python-tools/ev3devcmd
 """,
-      url="https://github.com/harcokuppens/thonny-ev3dev/wiki/ev3devcmd",
+      url="https://github.com/ev3dev-python-tools/ev3devcmd",
       author="Harco Kuppens",
       author_email="h.kuppens@cs.ru.nl",
       license="MIT",
@@ -52,10 +52,11 @@ For more info: https://github.com/harcokuppens/thonny-ev3dev/wiki/ev3devcmd
       # But sftpclone v1.2.2 works fine with the newer 'paramiko==2.6.0', so we took the HACK to include a mirror of it,
       # into this ev3devcmd package until a newer version of it requiring 'paramiko==2.6.0' would be available.
       # This HACK solves the dependency problem, because we then don't need the requirement for 'sftpclone=1.2.2' anymore.
+      # so:  removed 'sftpclone==1.2.2' from install_requires, and added  'ev3devcmd.sftpclone' to packages
       install_requires=['ev3devlogging','paramiko==2.6.0','rpyc==4.1.2'],
-      packages=['ev3devcmd','ev3devcmd.sftpclone'],
-      #install_requires=['ev3devlogging','paramiko==2.6.0','sftpclone==1.2.2','rpyc==4.1.2'],
-      #packages=['ev3devcmd'],
+      #instead of ['ev3devlogging','paramiko==2.6.0','sftpclone==1.2.2','rpyc==4.1.2'],
+      packages=['ev3devcmd'],
+      #instead of ['ev3devcmd'],
 
       package_data={'ev3devcmd': ['res/*']},
 

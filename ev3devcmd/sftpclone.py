@@ -42,7 +42,7 @@ def configure_logging(level=logging.DEBUG):
 
     logger = logging.getLogger(__name__)
     logger.setLevel(level)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(levelname)s - %(message)s')
     ch = logging.StreamHandler()
     ch.setLevel(level)
     ch.setFormatter(formatter)

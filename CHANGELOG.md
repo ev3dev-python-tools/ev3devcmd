@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - 2020-01-23
+## [1.0.0] - 2020-01-31
 
 ### ADDED
 - First production release which can be use with the thonny-ev3dev plugin in the Thonny IDE version 3. 
