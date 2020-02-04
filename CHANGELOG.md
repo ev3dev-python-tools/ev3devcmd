@@ -12,8 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ADDED
 - First production release which can be use with the thonny-ev3dev plugin in the Thonny IDE version 3. 
-- the mirror and cleanup commands also allow you to use a subdir of the homedir on the EV3 robot instead
+- the mirror/cleanup/upload/delete/download commands also allow you to use a subdir of the homedir on the EV3 robot instead
   of the homedir.
+- added mkdir and rmdir commands
 
 ### CHANGED
 - created new project  https://github.com/ev3dev-python-tools/ev3devcmd
