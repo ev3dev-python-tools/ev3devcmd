@@ -472,8 +472,16 @@ def rexists(sftp, path):
     else:
         return True
 
-def base_mirror(args,local_path,dest_path,mkdir_dest=False,rmdir_dest=False):
-   # do extra connect  only for nice error message in case of failure (don't want to hack sftpclone library for that)
+
+def base_mirror(args, local_path, dest_subdir, cleanup=False, skip_all_hidden=False ):
+
+    dest_path=ev3rootdir(args)
+    if dest_subdir:
+        dest_path=dest_path + dest_subdir
+
+
+
+    # do extra connect  only for nice error message in case of failure (don't want to hack sftpclone library for that)
     ssh=sshconnect(args)
 
     remote_url=r'{username}:{password}@{server}:{dest_dir}'.format(username=args.username, password=args.password,server=args.address,dest_dir=dest_path)
@@ -483,37 +491,55 @@ def base_mirror(args,local_path,dest_path,mkdir_dest=False,rmdir_dest=False):
     sftpclone.logger = sftpclone.configure_logging(level=logging.ERROR)
     sync = sftpclone.SFTPClone(local_path,remote_url)
 
-    # exclude from syncing the files and dirs in root of sourcedir which start with '.'
-    import glob
-    # expand local path to real path  => important for getting paths right in exclude list which is compared with the realpath
-    # note: within sftpclone paths give are also converted to real paths
-    local_path = os.path.realpath(os.path.expanduser(local_path))
+    # exclude files/dirs starting with '.' in rootdir from syncing/removing
+    mirroring_into_rootdir = not dest_subdir
+    if mirroring_into_rootdir:
+        # 1) exclude from removing the files/dirs starting with '.' in rootdir of destination dir
+        # REASON: to protect hidden . files and dirs in homedir on ev3 (eg. /home/robot/.bashrc) from removal!
+        # we implement this by patching sftp.remove and sftp.rmdir
+        global orig_remove
+        global base_remote_path
+        base_remote_path=sync.remote_path
+        global orig_rmdir
+        orig_remove=sync.sftp.remove
+        sync.sftp.remove=new_remove
+        orig_rmdir=sync.sftp.rmdir
+        sync.sftp.rmdir=new_rmdir
 
-    # exclude files/dirs in root of sourcedir starting with '.'
-    sync.exclude_list = {
-        g
-        for g in glob.glob(sftpclone.path_join(local_path, ".*"))
-    }
+        # 2) exclude from syncing files/dirs starting with '.' in root of sourcedir
+        # REASON: to protect hidden . files and dirs in homedir on ev3 from be overwritten!
+        import glob
+        # expand local path to real path  => important for getting paths right in exclude list which is compared with the realpath
+        # note: within sftpclone paths give are also converted to real paths
+        local_path = os.path.realpath(os.path.expanduser(local_path))
+        sync.exclude_list = {
+            g
+            for g in glob.glob(sftpclone.path_join(local_path, ".*"))
+        }
+
+
+
+    # https://en.wikipedia.org/wiki/Glob_(programming)
+    # The “**” pattern means “this directory and all subdirectories, recursively”.
+    # The"**/*" pattern means all files/dirs in “this directory and all subdirectories, recursively”.
+    #       `-> all files/dirs recursively within this directory
+    # The"**/__pycache__" pattern means all files/dirs recursively within this directory with the exact name "__pycache__"
 
     # exclude directories named __pycache__
+    # note: if a directory is in the sync.exclude_list then anything below it is also excluded!
+    # REASON: efficiency!!
     from pathlib import Path
-    for item in Path(local_path).glob( '**/__pycache__'):
-        sync.exclude_list.add(os.path.join(local_path,item))
+    for item in Path(local_path).glob('**/__pycache__'):
+        sync.exclude_list.add(os.path.realpath(item))
 
-    global orig_remove
-    global base_remote_path
-    base_remote_path=sync.remote_path
+    # if we are mirroring then  we can skip all hidden files from mirror when skip_all_hidden==True
+    if (not cleanup) and skip_all_hidden:
+       for item in Path(local_path).glob( '**/.*'):
+           sync.exclude_list.add(os.path.realpath(item))
 
-    global orig_rmdir
-
-
-    orig_remove=sync.sftp.remove
-    sync.sftp.remove=new_remove
-
-    orig_rmdir=sync.sftp.rmdir
-    sync.sftp.rmdir=new_rmdir
-
-    if mkdir_dest and not rexists(sync.sftp,dest_path):
+    # create destination subdirectory before mirroring if it not yet exists
+    # note: we skip this when doing a cleanup
+    if (not cleanup) and dest_subdir and (not rexists(sync.sftp, dest_path)):
         try:
             sync.sftp.mkdir(dest_path)
         except Exception as ex:
@@ -523,7 +549,9 @@ def base_mirror(args,local_path,dest_path,mkdir_dest=False,rmdir_dest=False):
 
     sync.run()
 
-    if rmdir_dest:
+    # if cleanup a directory(mirroring with an empty dir) and destination is a subdirectory
+    # then we remove the empty directory afterwards
+    if cleanup and dest_subdir:
        try:
            sync.sftp.rmdir(dest_path)
        except Exception as ex:
@@ -535,43 +563,35 @@ def base_mirror(args,local_path,dest_path,mkdir_dest=False,rmdir_dest=False):
 #----------------------------------------------------
 
 
+def check_subdir(subdir):
+    if subdir is not None:
+        if(  os.path.isabs(subdir) ):
+            print("Subdir argument '{0}' is not a relative path".format(subdir),file=sys.stderr)
+            sys.exit(1)
+
 def mirror(args):
 
-    src_path=args.sourcedir
-    dest_path=ev3rootdir(args)
-    make_subdir=False
-    if args.subdir is not None:
-        if(  os.path.isabs(args.subdir) ):
-            print("Subdir argument '{0}' is not a relative path".format(args.subdir),file=sys.stderr)
-            sys.exit(1)
-        dest_path=ev3rootdir(args) + args.subdir
-        make_subdir=True
+    dest_subdir= args.subdir
+    check_subdir(dest_subdir)
 
+    src_path=args.sourcedir
+    skip_all_hidden= not args.all
 
     print("Mirror")
-    base_mirror(args,src_path,dest_path,mkdir_dest=make_subdir)
+    base_mirror(args, src_path, dest_subdir,skip_all_hidden=skip_all_hidden)
     print("\n\nmirror succesfull")
 
 def cleanup(args):
+    # cleanup of homedir[/SUBDIR]; other locations are not cleanable (because to dangerous);
 
-    # cleanup of homedir; other locations are not cleanable (because to dangerous);
-    # however we can also only cleanup a subdir of homedir
-    # note: also removes subdirs in homedir
-
-    dest_path=ev3rootdir(args)
-    remove_subdir=False
-    if args.subdir is not None:
-       if(  os.path.isabs(args.subdir) ):
-           print("Subdir argument '{0}' is not a relative path".format(args.subdir),file=sys.stderr)
-           sys.exit(1)
-       dest_path=ev3rootdir(args) + args.subdir
-       remove_subdir=True
+    dest_subdir= args.subdir
+    check_subdir(dest_subdir)
 
     import tempfile
     src_path=tempfile.mkdtemp()
 
     print("Cleanup")
-    base_mirror(args,src_path,dest_path,rmdir_dest=remove_subdir)
+    base_mirror(args, src_path, dest_subdir, cleanup=True)
     print("\n\ncleanup succesfull")
 
 
@@ -739,19 +759,29 @@ def main(argv=None):
     # create the parser for the "clean" command
     parser_clean_description='delete all files in homedir[/subdir] on EV3'
     parser_clean = subparsers.add_parser('cleanup',description=parser_clean_description, help=parser_clean_description,formatter_class=CustomFormatter)
-    parser_clean.add_argument('subdir', nargs='?', type=str,help="subdirectory in homedir on EV3; if specified only that directory gets cleaned instead of the whole homedir. Must be relative path.")
+    parser_clean.add_argument('subdir', nargs='?', type=str,help="subdirectory in homedir on EV3; if specified only that directory gets cleaned instead of the whole homedir. Must be relative path.\nHidden files/dirs starting with '.' in homedir on EV3 are preserved by excluding them from cleanup.")
     parser_clean.set_defaults(func=cleanup)
     # create the parser for the "mirror" command
+    # note: help message is shown for general help "ev3dev -h", long description for specific help "ev3dev mirror -h"
+    parser_mirror_help= "Mirror sourcedir into homedir[/subdir] on EV3. Subdirs within sourcedir are recursively mirrored."
     parser_mirror_description= \
-    'mirror sourcedir into homedir[/subdir] on EV3.\nSubdirs within sourcedir are recursively mirrored.\nFiles/dirs within homedir[/subdir] but not in sourcedir are removed.\n\n'\
+    "Mirror sourcedir into homedir[/subdir] on EV3.\nSubdirs within sourcedir are recursively mirrored.\n"\
+    + "Files/dirs within homedir[/subdir] but not in sourcedir are removed.\n"\
+    + "Hidden files/dirs starting with '.' in homedir on EV3 are ALWAYS PRESERVED by excluding mirroring\n"\
+    + "of hidden files at the root of the sourcedir into the homedir.\n"\
+    + "Directories with the name '__pycache__' are ALWAYS excluded from mirroring.\n"\
+    + "\n"\
     + "When uploading a script then the executable is set and a shebang added if not yet there.\n" \
-    + "If using mirror on linux/macos then make sure main script is executable and has shebang line,\n" \
-    + "or otherwise upload main script separately afterwards.\n" \
-    + "If using mirror on windows then upload main script separately afterwards. Note that on windows\n" \
+    + "If using mirror on linux/macos then make sure the main script is executable and has a shebang line,\n" \
+    + "or otherwise upload the main script separately afterwards.\n" \
+    + "If using mirror on windows then upload the main script separately afterwards. Note that on windows\n" \
     + "you cannot set an executable bit on a file.\n"
-    parser_mirror = subparsers.add_parser('mirror',description=parser_mirror_description, help=parser_mirror_description,formatter_class=CustomFormatter)
+    parser_mirror = subparsers.add_parser('mirror',description=parser_mirror_description, help=parser_mirror_help,formatter_class=CustomFormatter)
+    parser_mirror.add_argument('-a', '--all',action='store_true',help="do not exclude hidden files/dirs starting with '.' from mirroring. Hidden files/dirs can only be mirrored within subdirectories. In the root of the home directory of the EV3 they are ALWAYS excluded from mirroring to protect the user's configuration files in his home directory.")
     parser_mirror.add_argument('sourcedir', type=str,help="source directory which gets mirrored.")
     parser_mirror.add_argument('subdir', nargs='?', type=str,help="subdirectory in homedir on EV3 where it gets mirrored instead of the homedir. Must be relative path.")
+
+
     parser_mirror.set_defaults(func=mirror)
 
     # create the parser for the "rmdir" command

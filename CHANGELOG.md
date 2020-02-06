@@ -8,12 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - 2020-01-31
+## [1.0.0] - 2020-02-06
 
 ### ADDED
 - First production release which can be use with the thonny-ev3dev plugin in the Thonny IDE version 3. 
 - the mirror/cleanup/upload/delete/download commands also allow you to use a subdir of the homedir on the EV3 robot instead
   of the homedir.
+- the mirror command by default doesn't mirror hidden files and directories. The mirror command has new option "-a" or "--all" 
+  to specify whether hidden files should also be mirrored.  
 - added mkdir and rmdir commands
 
 ### CHANGED
