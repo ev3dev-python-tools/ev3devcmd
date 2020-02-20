@@ -222,6 +222,9 @@ def stop_rpyc(args):
 
     print("kill programs running on EV3")
     # kill programs running on ev3
+    # note: when killing a negative process id it kill the process id  all its child processes
+    # note: we assume only on program (and its child programs) running
+    #       however if there are more, then they also get killed but without their child processes (no '-' prepended)
     command="kill -9 -`pgrep -f 'python3 " + ev3rootdir(args) + "'`"
 
     # no sudo needed, program runs as user robot
@@ -257,6 +260,9 @@ def stop_ssh(args):
 
         # first quickly kill process, then do slower cleanup afterwards
         print("kill program running on EV3\n")
+        # note: when killing a negative process id it kill the process id  all its child processes
+        # note: we assume only on program (and its child programs) running
+        #       however if there are more, then they also get killed but without their child processes (no '-' prepended)
         ssh.exec_command("kill -9 -`pgrep -f 'python3 " + ev3rootdir(args) + "'`")
 
         # create interactive shell
@@ -804,8 +810,22 @@ def main(argv=None):
     parser_start.set_defaults(func=start)
 
     # create the parser for the "stop" command
-    parser_stop_description="stop program/motors/sound on EV3"
-    parser_stop = subparsers.add_parser('stop',description=parser_stop_description, help=parser_stop_description,formatter_class=CustomFormatter)
+    parser_stop_help="stop program/motors/sound on EV3"
+    parser_stop_description=(
+        "stop program/motors/sound on EV3\n"
+        "\n"
+        "The stop command tries first to execute the stop with the RPyC protocol, and if it fails it tries again\n"
+        "with the ssh protocol. The reason that first the stop via the RPyC protocol is tried is because it is\n"
+        "much faster than with the ssh protocol. However for the RPyC protocol to work there must be an RPyC server\n"
+        "installed on the EV3. Because this is not always the case, we have by default a small timeout for the RPyC\n"
+        "protocol and a fallback to the ssh protocol. So in case RPyC fails it can quickly switch to ssh.\n"
+        "However when we have an RPyC server installed on the EV3 we might for some special cases need to increase\n"
+        "the RPyC timeout, and or even force only the use of the RPyC protocol.\n"
+        "\n"
+        "The default timeout for the RPyC protocol is 0.1 seconds.\n"
+        "The fixed timeout for the ssh procotol is 3 seconds.\n"
+    )
+    parser_stop = subparsers.add_parser('stop',description=parser_stop_description, help=parser_stop_help,formatter_class=CustomFormatter)
     # rpyc_timeout
     parser_stop.add_argument('-t', '--rpyc-timeout',type=float,help="timeout for rpyc connection", default=0.1)
     parser_stop.add_argument('-f', '--rpyc-only',action='store_true',help="only connect with rpyc and don't use ssh fallback if rpyc connection fails")
