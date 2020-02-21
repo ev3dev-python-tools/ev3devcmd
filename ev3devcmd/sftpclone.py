@@ -56,7 +56,10 @@ def path_join(*args):
     Makes sure to join paths of the same type (bytes).
     """
     args = (paramiko.py3compat.u(arg) for arg in args)
-    return os.path.join(*args)
+    result=os.path.join(*args)
+    # convert windows backslashes to forward slashes, because sftp expects forward slashes as directory separator
+    return result.replace("\\","/")
+
 
 
 def parse_username_password_hostname(remote_url):
@@ -423,7 +426,6 @@ class SFTPClone(object):
 
         for remote_st in self.sftp.listdir_attr(remote_path):
             r_lstat = self.sftp.lstat(path_join(remote_path, remote_st.filename))
-
             inner_remote_path = path_join(remote_path, remote_st.filename)
             inner_local_path = path_join(local_path, remote_st.filename)
 
@@ -593,6 +595,11 @@ class SFTPClone(object):
         """Run the sync.
 
         Confront the local and the remote directories and perform the needed changes."""
+
+        # In sftpclone we always use forward slashes; for both windows as linux paths
+        # So we need to convert any windows forward slashes into back slashes in the exclude list.
+        self.exclude_list= [ item.replace("\\","/") for item in self.exclude_list]
+
         try:
             if self.delete:
                 # First check for items to be removed
