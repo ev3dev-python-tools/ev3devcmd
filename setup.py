@@ -2,10 +2,11 @@ from setuptools import setup
 import os.path
 import sys
 
+from ev3devcmd.version import __version__ as pkgversion
 
 setup(
       name="ev3devcmd",
-      version="1.0.1",
+      version=pkgversion,
       description="ev3devcmd library and cmdline utility",
       long_description="""
 ev3devcmd library and cmdline utility

@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2020-02-28
+ 
+ ### Fixed 
+  - fixed mirror and cleanup command for windows; the used sftpclone library
+    didn't handle the backslash used in windows path's correctly, this was fixed
+    by converting all backslashes to forward slashes which python handles 
+    correctly on all platforms
+
 ## [1.0.1] - 2020-02-07
 
  ### Added
