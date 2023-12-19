@@ -47,15 +47,15 @@ For more info: https://github.com/ev3dev-python-tools/ev3devcmd
 
       # TEMPORARY HACK:
       # We use a mirror of sftpclone v1.2.2, because it has explicit dependency 'paramiko==2.4.1',
-      # but we need 'paramiko==2.6.0' for ev3devcmd!
+      # but we need 'paramiko==3.4.0' for ev3devcmd!
       # When we used sftpclone v1.2.2 as dependency, then the entry script would thrown an version conflict error
-      # because ev3devcmd needs 'paramiko==2.6.0' and sftpclone needs 'paramiko==2.4.1'.
-      # But sftpclone v1.2.2 works fine with the newer 'paramiko==2.6.0', so we took the HACK to include a mirror of it,
-      # into this ev3devcmd package until a newer version of it requiring 'paramiko==2.6.0' would be available.
+      # because ev3devcmd needs 'paramiko==3.4.0' and sftpclone needs 'paramiko==2.4.1'.
+      # But sftpclone v1.2.2 works fine with the newer 'paramiko==3.4.0', so we took the HACK to include a mirror of it,
+      # into this ev3devcmd package until a newer version of it requiring 'paramiko==3.4.0' would be available.
       # This HACK solves the dependency problem, because we then don't need the requirement for 'sftpclone=1.2.2' anymore.
       # so:  removed 'sftpclone==1.2.2' from install_requires, and added  'ev3devcmd.sftpclone' to packages
-      install_requires=['ev3devlogging','paramiko==2.6.0','rpyc==4.1.2'],
-      #instead of ['ev3devlogging','paramiko==2.6.0','sftpclone==1.2.2','rpyc==4.1.2'],
+      install_requires=['ev3devlogging','paramiko==3.4.0','rpyc==4.1.2'],
+      #instead of ['ev3devlogging','paramiko==3.4.0','sftpclone==1.2.2','rpyc==4.1.2'],
       packages=['ev3devcmd'],
       #instead of ['ev3devcmd'],
 
